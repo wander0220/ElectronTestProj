@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<head>
+  <meta
+    property="og:description"
+    content="Use flyTo with flyOptions to slowly zoom to a location."
+  />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/maplibre-gl@5.3.0/dist/maplibre-gl.css"
+  />
+  <script src="https://unpkg.com/maplibre-gl@5.3.0/dist/maplibre-gl.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+    html,
+    body,
+    #map {
+      height: 100%;
+    }
+  </style>
+</head>
+<html>
+  <head>
+    <title>Electron App</title>
+  </head>
+  <body>
+    <div id="map"></div>
+  </body>
+  <script>
+    const map = new maplibregl.Map({
+      container: "map",
+      style: "https://demotiles.maplibre.org/style.json",
+      center: [126.72522204740909, 37.55576575050752],
+      zoom: 6,
+    });
+    // 빈 GeoJSON 객체 생성
+    const geojson = {
+      type: "FeatureCollection",
+      features: [],
+    };
+
+    // map이 로드되면, geojson Source와 Layer 추가
+    map.on("load", function () {
+      map.addSource("points", {
+        type: "geojson",
+        data: geojson,
+      });
+      map.addLayer({
+        id: "pointsLayer",
+        type: "circle",
+        source: "points",
+        paint: {
+          "circle-radius": 6,
+          "circle-color": "#B42222",
+        },
+      });
+    });
+
+    // map 클릭 시 좌표를 기반으로 새로운 Feature 추가
+    map.on("click", function (e) {
+      const coords = [e.lngLat.lng, e.lngLat.lat];
+      const newFeature = {
+        type: "Feature",
+        geometry: {
+          type: "Point",
+          coordinates: coords,
+        },
+        properties: {},
+      };
+      geojson.features.push(newFeature);
+      // Source의 데이터를 새로고침
+      map.getSource("points").setData(geojson);
+    });
+
+    // Electron IPC 모듈 접근 (nodeIntegration true로 설정되어 있어 사용 가능)
+    const { ipcRenderer } = require("electron");
+
+    // UDP 메시지로부터 좌표 정보를 받아 GeoJSON 업데이트
+    ipcRenderer.on("udp-message", (event, data) => {
+      geojson.features.push(data);
+      map.getSource("points").setData(geojson);
+    });
+  </script>
+</html>
